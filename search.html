@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>本地盗文链接搜索助手（离线单文件）</title>
+  <style>
+    :root{
+      --bg:#f6f8fb;
+      --card:#ffffff;
+      --accent:#2b7cff;
+      --muted:#6b7280;
+      --danger:#d9534f;
+      --radius:10px;
+      font-family: "PingFang SC", "Noto Sans SC", "Microsoft Yahei", Arial, sans-serif;
+    }
+    body{
+      margin:0;
+      background:linear-gradient(180deg,#eef5ff 0%,var(--bg) 100%);
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:32px;
+      color:#111827;
+    }
+    .wrap{
+      width:980px;
+      max-width:96vw;
+      background:var(--card);
+      border-radius:calc(var(--radius) + 4px);
+      box-shadow:0 8px 30px rgba(17,24,39,0.08);
+      padding:20px;
+    }
+    h1{margin:6px 0 10px;font-size:20px}
+    p.lead{margin:0 0 18px;color:var(--muted)}
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 120px;
+      gap:12px;
+      align-items:end;
+      margin-bottom:16px;
+    }
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input[type="text"]{
+      width:100%;
+      padding:10px 12px;
+      border-radius:8px;
+      border:1px solid #e6e9ef;
+      outline:none;
+      font-size:14px;
+      box-sizing:border-box;
+    }
+    .btn{
+      background:linear-gradient(180deg,var(--accent),#175bff);
+      color:white;
+      border:none;
+      padding:10px 16px;
+      border-radius:10px;
+      font-weight:600;
+      cursor:pointer;
+      box-shadow:0 6px 18px rgba(43,124,255,0.22);
+    }
+    .btn:disabled{opacity:0.6;cursor:not-allowed}
+    .flex-row{display:flex;gap:12px;align-items:center}
+    .panel{
+      background:#fbfdff;
+      border:1px solid #eef3ff;
+      padding:12px;
+      border-radius:8px;
+      margin-top:12px;
+    }
+    .keywords{display:flex;flex-wrap:wrap;gap:8px}
+    .chip{background:#eef6ff;color:#0b3a8a;padding:6px 10px;border-radius:999px;font-size:13px;border:1px solid #e1f0ff}
+    .results{margin-top:12px}
+    .kw-block{margin-bottom:12px}
+    a.result-link{display:block;padding:8px 10px;border-radius:8px;text-decoration:none;color:#0b3a8a;border:1px solid transparent}
+    a.result-link:hover{background:#f1f6ff;border-color:#e6f0ff}
+    .meta{font-size:12px;color:var(--muted);margin-top:6px}
+    .loader{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      font-size:14px;
+      color:var(--muted);
+    }
+    .dot{
+      width:8px;height:8px;border-radius:50%;
+      background:var(--accent);
+      opacity:0.85;
+      animation:blink 1s infinite;
+    }
+    .dot:nth-child(2){animation-delay:0.15s}
+    .dot:nth-child(3){animation-delay:0.3s}
+    @keyframes blink{0%{transform:translateY(0);opacity:1}50%{transform:translateY(-6px);opacity:.45}100%{transform:translateY(0);opacity:1}}
+    .note{font-size:13px;color:var(--muted);margin-top:8px}
+    .danger{color:var(--danger);font-weight:600}
+    .small{font-size:13px;color:var(--muted)}
+    footer{margin-top:14px;font-size:12px;color:var(--muted)}
+    .hint{padding:10px;border-radius:8px;background:#fff7ed;border:1px solid #ffedd5;color:#7a4f00}
+    .kbd{font-family:monospace;background:#f3f4f6;padding:4px 6px;border-radius:6px;border:1px solid #e6e9ef;font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrap" role="main">
+    <h1>本地盗文链接搜索助手（单文件，无服务器）</h1>
+    <p class="lead">输入书名 / 作者 / 主角名，自动生成盗文检索关键词，并为每个关键词生成百度 / 必应 / 谷歌 / 夸克的一键搜索链接。</p>
+
+    <div class="grid" style="align-items:start">
+      <div>
+        <label for="title">文名（书名）</label>
+        <input id="title" type="text" placeholder="例如：大主宰" value="">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label for="author">作者</label>
+        <input id="author" type="text" placeholder="例如：天蚕土豆" value="">
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
+      <div>
+        <label for="hero">主角名字（多个主角用逗号分隔）</label>
+        <input id="hero" type="text" placeholder="例如：林动,萧炎" value="">
+      </div>
+      <div style="display:flex;flex-direction:column;justify-content:flex-end;gap:8px">
+        <div class="flex-row" style="justify-content:flex-end">
+          <button id="startBtn" class="btn">开始搜索</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" aria-live="polite">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <strong>生成的关键词</strong>
+          <div class="small" style="margin-top:6px">（按规则自动补充常见盗文站/格式关键词）</div>
+        </div>
+        <div id="statusArea" class="small"></div>
+      </div>
+
+      <div id="keywordContainer" class="keywords" style="margin-top:12px"></div>
+
+      <div class="note" style="margin-top:12px" id="corsNote">
+        当前版本不会在浏览器里自动爬取搜索结果页，而是帮你批量生成常见盗文关键词，并提供百度 / 必应 / 谷歌 / 夸克的一键搜索链接，点击即可在对应搜索引擎中查看结果。
+      </div>
+
+      <div class="results" id="results"></div>
+
+      <div style="margin-top:10px" id="moreInfo"></div>
+    </div>
+
+    <footer>
+      <div style="margin-top:8px">
+        <span class="small">纯前端单文件实现，无需服务器。若需要真正“自动解析搜索结果页”的功能，需要配合后端代理或浏览器插件。</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+  // --- DOM 元素 ---
+  const titleInput = document.getElementById('title');
+  const authorInput = document.getElementById('author');
+  const heroInput   = document.getElementById('hero');
+  const startBtn    = document.getElementById('startBtn');
+  const keywordContainer = document.getElementById('keywordContainer');
+  const resultsDiv  = document.getElementById('results');
+  const statusArea  = document.getElementById('statusArea');
+  const moreInfo    = document.getElementById('moreInfo');
+  const corsNote    = document.getElementById('corsNote');
+
+  // 去重
+  function uniqueArray(arr){ return Array.from(new Set(arr)); }
+
+  // 生成盗文相关关键词
+  function generateKeywords({title, author, heroes}) {
+    title  = (title  || '').trim();
+    author = (author || '').trim();
+    heroes = heroes.map(h => h.trim()).filter(Boolean);
+
+    const kws = new Set();
+
+    if (title) kws.add(title);
+
+    const titleSuffixes = [
+      "免费", "最新章节", "完结", "txt下载", "TXT下载",
+      "全文阅读", "笔趣阁", "免费阅读", "小说网",
+      "无弹窗", "全集", "全本", "完本"
+    ];
+    if (title) {
+      titleSuffixes.forEach(suf => kws.add(title + " " + suf));
+    }
+
+    if (author) {
+      kws.add(author + " 小说");
+      kws.add(author + " 全集");
+      kws.add(author + " txt下载");
+    }
+
+    if (heroes.length >= 1) {
+      kws.add(heroes[0] + " 小说全文");
+      kws.add(heroes[0] + " 主角 小说");
+    }
+    if (heroes.length >= 2) {
+      kws.add(heroes[0] + " " + heroes[1] + " 小说");
+    }
+
+    // 常见盗文/资源站词
+    const commonSites = [
+      "笔趣阁", "小说阅读网",
+      "全文阅读", "TXT下载", "TXT全集", "完本小说",
+      "无弹窗", "免费连载", "看书网", "小书屋",
+      "百度网盘", "夸克网盘", "云盘 资源"
+    ];
+    commonSites.forEach(site => {
+      if (title) {
+        kws.add(`${title} ${site}`);
+        kws.add(`${title} ${site} 下载`);
+      }
+      if (author) {
+        kws.add(`${author} ${site}`);
+      }
+    });
+
+    // 标题拆词
+    if (title) {
+      const parts = title.split(/[\s:_\-—]+/).filter(Boolean);
+      parts.forEach(p => {
+        if (p.length > 1) {
+          kws.add(p + " 小说");
+          kws.add(p + " 全文");
+        }
+      });
+    }
+
+    // 转成数组，限制上限（避免太多）
+    return Array.from(kws).filter(Boolean).slice(0, 200);
+  }
+
+  // 渲染关键词 chips
+  function renderKeywords(kws){
+    keywordContainer.innerHTML = "";
+    kws.forEach(k => {
+      const span = document.createElement('div');
+      span.className = 'chip';
+      span.textContent = k;
+      keywordContainer.appendChild(span);
+    });
+  }
+
+  // 状态显示
+  function setStatus(text, busy=false){
+    statusArea.innerHTML = busy
+      ? `<span class="loader"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp;${text}</span>`
+      : text;
+  }
+
+  // 根据关键词生成 4 大搜索引擎的搜索链接
+  function searchKeywords(keywords){
+    resultsDiv.innerHTML = "";
+    const globalSeen = new Set();
+    const perKeywordResults = {}; // kw -> [{engine,url},...]
+
+    keywords.forEach(kw => {
+      const list = [
+        { engine: "百度", url: `https://www.baidu.com/s?wd=${encodeURIComponent(kw)}` },
+        { engine: "必应", url: `https://www.bing.com/search?q=${encodeURIComponent(kw)}` },
+        { engine: "谷歌", url: `https://www.google.com/search?q=${encodeURIComponent(kw)}` },
+        { engine: "夸克", url: `https://quark.sm.cn/s?q=${encodeURIComponent(kw)}` },
+      ];
+      perKeywordResults[kw] = list;
+      list.forEach(item => globalSeen.add(item.url));
+    });
+
+    renderResults(perKeywordResults, globalSeen);
+    setStatus('已为每个关键词生成百度 / 必应 / 谷歌 / 夸克搜索链接。', false);
+    corsNote.style.display = 'block';
+    moreInfo.innerHTML = '';
+    // 保持原来的 async 调用习惯，返回一个已完成的 Promise
+    return Promise.resolve({perKeywordResults, globalSeen});
+  }
+
+  // 渲染结果：每个关键词下 4 个搜索引擎链接
+  function renderResults(perKeywordResults, globalSeen){
+    resultsDiv.innerHTML = "";
+    const keys = Object.keys(perKeywordResults);
+    if (keys.length === 0){
+      resultsDiv.innerHTML = `<div class="small">尚无结果</div>`;
+      return;
+    }
+
+    keys.forEach(kw => {
+      const block = document.createElement('div');
+      block.className = 'kw-block';
+
+      const title = document.createElement('div');
+      title.innerHTML =
+        `<strong>关键词：</strong> ${escapeHtml(kw)} ` +
+        `<span class="meta">（为该关键词生成 4 个搜索引擎链接）</span>`;
+      block.appendChild(title);
+
+      const listDiv = document.createElement('div');
+
+      (perKeywordResults[kw] || []).forEach(item => {
+        const a = document.createElement('a');
+        a.className = 'result-link';
+        a.href = item.url;
+        a.target = '_blank';
+        a.rel   = 'noopener noreferrer';
+        a.textContent = `${item.engine}：${shortenText(item.url, 80)}`;
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = item.url;
+
+        listDiv.appendChild(a);
+        listDiv.appendChild(meta);
+      });
+
+      block.appendChild(listDiv);
+      resultsDiv.appendChild(block);
+    });
+
+    const summary = document.createElement('div');
+    summary.className = 'meta';
+    summary.style.marginTop = '10px';
+    summary.textContent = `共生成 ${globalSeen.size} 条搜索引擎链接（去重后统计）。`;
+    resultsDiv.appendChild(summary);
+  }
+
+  // 工具函数
+  function escapeHtml(s){
+    return (s || '').replace(/[&<>'"]/g, c => ({
+      '&':'&amp;',
+      '<':'&lt;',
+      '>':'&gt;',
+      '"':'&quot;',
+      "'":'&#39;'
+    }[c]));
+  }
+
+  function shortenText(s, n){
+    if (!s) return '';
+    return s.length > n ? s.slice(0, n - 1) + '…' : s;
+  }
+
+  // 事件绑定
+  startBtn.addEventListener('click', async () => {
+    const title  = titleInput.value.trim();
+    const author = authorInput.value.trim();
+    const heroesRaw = heroInput.value.trim();
+    const heroes = heroesRaw
+      ? heroesRaw.split(/[，,;]/).map(s => s.trim()).filter(Boolean)
+      : [];
+
+    if (!title && !author && heroes.length === 0){
+      alert('请至少填写文名、作者或主角之一。');
+      return;
+    }
+
+    startBtn.disabled = true;
+    setStatus('生成关键词中...', true);
+
+    const keywords = generateKeywords({title, author, heroes});
+    renderKeywords(keywords);
+
+    setStatus('正在生成各搜索引擎链接...', true);
+
+    try{
+      await searchKeywords(keywords);
+    }catch(e){
+      console.error(e);
+      setStatus('生成搜索链接过程中出现错误，请打开控制台查看详情。', false);
+    }finally{
+      startBtn.disabled = false;
+    }
+  });
+
+  // 初始化
+  (function init(){
+    setStatus('就绪。填写信息并点击「开始搜索」。', false);
+  })();
+  </script>
+</body>
+</html>
